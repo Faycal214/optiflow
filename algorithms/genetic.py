@@ -1,46 +1,48 @@
 # algorithms/genetic.py
 import random
+import numpy as np
 from core.base_optimizer import BaseOptimizer, Candidate
 
 class GeneticOptimizer(BaseOptimizer):
-    def __init__(self, search_space, population_size=10, elite_frac=0.2, mutation_prob=0.2):
+    def __init__(self, search_space, population_size=20, generations=20, mutation_rate=0.2, elite_frac=0.2):
         self.search_space = search_space
         self.pop_size = population_size
+        self.generations = generations
+        self.mutation_rate = mutation_rate
         self.elite_frac = elite_frac
-        self.mutation_prob = mutation_prob
-        self.population = [Candidate(self.search_space.sample()) for _ in range(self.pop_size)]
+        self.population = [Candidate(self.search_space.sample()) for _ in range(population_size)]
 
     def suggest(self, n=None):
-        # return current population to evaluate
+        # Return current population for evaluation
         return self.population
 
     def update(self, results):
-        # results: list of Candidate with score filled (lower is better)
-        # sort ascending by score
+        # Sort by fitness (lower score = better)
         sorted_pop = sorted(results, key=lambda c: c.score)
         elite_count = max(1, int(self.elite_frac * len(sorted_pop)))
         elites = sorted_pop[:elite_count]
 
-        # produce children
-        children = []
-        while len(children) < self.pop_size - elite_count:
-            a, b = random.sample(elites, 2)
-            child_params = self.crossover(a.params, b.params)
+        # Breed new individuals
+        new_population = []
+        while len(new_population) < self.pop_size - elite_count:
+            p1, p2 = random.sample(elites, 2)
+            child_params = self.crossover(p1.params, p2.params)
             child_params = self.mutate(child_params)
-            children.append(Candidate(child_params))
+            new_population.append(Candidate(child_params))
 
-        self.population = elites + children
+        self.population = elites + new_population
 
     def crossover(self, p1, p2):
         child = {}
-        for k in p1:
+        for k in p1.keys():
+            # 50/50 parameter inheritance
             child[k] = random.choice([p1[k], p2[k]])
         return child
 
     def mutate(self, params):
-        for k in params:
-            if random.random() < self.mutation_prob:
-                info = self.search_space.parameters[k]
+        # Randomly perturb selected parameters
+        for k, info in self.search_space.parameters.items():
+            if random.random() < self.mutation_rate:
                 if info["type"] == "continuous":
                     low, high = info["values"]
                     params[k] = random.uniform(low, high)
