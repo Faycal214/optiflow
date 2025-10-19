@@ -1,16 +1,15 @@
-# core/model_wrapper.py
-from sklearn.base import clone
 from sklearn.model_selection import cross_val_score
-import numpy as np
 
-class SklearnWrapper:
-    def __init__(self, model_cls):
-        # model_cls is the class (e.g., sklearn.svm.SVC)
-        self.model_cls = model_cls
+class ModelWrapper:
+    def __init__(self, model_class, preprocess=None):
+        self.model_class = model_class
+        self.preprocess = preprocess  # optional preprocessing hook
 
-    def train_and_score(self, params: dict, X, y, cv=3, scoring="accuracy", random_state=42):
-        model = self.model_cls(**params)
-        # cross_val_score returns array; higher is better
+    def train_and_score(self, params, X, y, cv=3, scoring="accuracy"):
+        # Apply preprocessing if defined
+        if self.preprocess is not None:
+            params = self.preprocess(params)
+
+        model = self.model_class(**params)
         scores = cross_val_score(model, X, y, cv=cv, scoring=scoring)
-        # we return a scalar cost (lower is better) to standardize
-        return -float(np.mean(scores))  # negative accuracy as cost
+        return scores.mean()

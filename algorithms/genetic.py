@@ -1,54 +1,81 @@
 # algorithms/genetic.py
 import random
-import numpy as np
+from typing import List
 from core.base_optimizer import BaseOptimizer, Candidate
+from core.search_space import SearchSpace
+import copy
 
 class GeneticOptimizer(BaseOptimizer):
-    def __init__(self, search_space, population_size=20, generations=20, mutation_rate=0.2, elite_frac=0.2):
-        self.search_space = search_space
-        self.pop_size = population_size
-        self.generations = generations
-        self.mutation_rate = mutation_rate
+    def __init__(self, search_space: SearchSpace, population: int = 20, elite_frac: float = 0.2,
+                 crossover_prob: float = 0.8, mutation_prob: float = 0.2, seed: int = None):
+        self.space = search_space
+        self.pop_size = population
         self.elite_frac = elite_frac
-        self.population = [Candidate(self.search_space.sample()) for _ in range(population_size)]
+        self.crossover_prob = crossover_prob
+        self.mutation_prob = mutation_prob
+        self.rng = random.Random(seed)
 
-    def suggest(self, n=None):
-        # Return current population for evaluation
-        return self.population
+        # population of Candidate
+        self.population: List[Candidate] = [Candidate(self.space.sample()) for _ in range(self.pop_size)]
+        # after evaluation each candidate should have .score
 
-    def update(self, results):
-        # Sort by fitness (lower score = better)
-        sorted_pop = sorted(results, key=lambda c: c.score)
-        elite_count = max(1, int(self.elite_frac * len(sorted_pop)))
-        elites = sorted_pop[:elite_count]
+    def suggest(self, n: int = None) -> List[Candidate]:
+        # if population un-evaluated return initial
+        return list(self.population)
 
-        # Breed new individuals
-        new_population = []
-        while len(new_population) < self.pop_size - elite_count:
-            p1, p2 = random.sample(elites, 2)
-            child_params = self.crossover(p1.params, p2.params)
-            child_params = self.mutate(child_params)
-            new_population.append(Candidate(child_params))
+    def update(self, results: List[Candidate]):
+        # results: list of evaluated Candidate with .score (lower better)
+        # sort ascending by cost
+        results = sorted(results, key=lambda c: c.score)
+        elite_n = max(1, int(self.elite_frac * len(results)))
+        elites = results[:elite_n]
 
-        self.population = elites + new_population
+        # produce new population
+        new_pop = elites.copy()
+        while len(new_pop) < self.pop_size:
+            parent_a = self._tournament_select(results)
+            parent_b = self._tournament_select(results)
+            child_params = self._crossover(parent_a.params, parent_b.params)
+            child_params = self._mutate(child_params)
+            new_pop.append(Candidate(child_params))
+        self.population = new_pop
 
-    def crossover(self, p1, p2):
+    # ---------------- helpers ----------------
+    def _tournament_select(self, population, k=3):
+        pick = self.rng.sample(population, min(k, len(population)))
+        return min(pick, key=lambda c: c.score)
+
+    def _crossover(self, a: dict, b: dict) -> dict:
+        if self.rng.random() > self.crossover_prob:
+            return copy.deepcopy(a) if self.rng.random() < 0.5 else copy.deepcopy(b)
+
         child = {}
-        for k in p1.keys():
-            # 50/50 parameter inheritance
-            child[k] = random.choice([p1[k], p2[k]])
+        for key in a.keys():
+            # uniform crossover
+            child[key] = copy.deepcopy(a[key]) if self.rng.random() < 0.5 else copy.deepcopy(b[key])
         return child
 
-    def mutate(self, params):
-        # Randomly perturb selected parameters
-        for k, info in self.search_space.parameters.items():
-            if random.random() < self.mutation_rate:
-                if info["type"] == "continuous":
-                    low, high = info["values"]
-                    params[k] = random.uniform(low, high)
-                elif info["type"] == "discrete":
-                    low, high = info["values"]
-                    params[k] = random.randint(low, high)
+    def _mutate(self, params: dict) -> dict:
+        new = copy.deepcopy(params)
+        for k, info in self.space.parameters.items():
+            if self.rng.random() > self.mutation_prob:
+                continue
+            t = info["type"]
+            if t == "categorical":
+                new[k] = self.rng.choice(info["values"])
+            elif t == "discrete":
+                v = info["values"]
+                if isinstance(v, (list, tuple)):
+                    new[k] = self.rng.choice(v)
                 else:
-                    params[k] = random.choice(info["values"])
-        return params
+                    low, high = v
+                    new[k] = self.rng.randint(low, high)
+            else:  # continuous
+                low, high = info["values"]
+                log = info.get("log", False)
+                if log:
+                    new[k] = float(self.rng.uniform(math.log(low), math.log(high)))
+                    new[k] = math.exp(new[k])
+                else:
+                    new[k] = float(self.rng.uniform(low, high))
+        return new
