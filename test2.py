@@ -1,13 +1,8 @@
-from sklearn.datasets import load_iris
+# core/optimize_pipeline.py
 from core.model_search_manager import ModelSearchManager
+from sklearn.datasets import load_iris
 
-X, y = load_iris(return_X_y=True)
-
-# random search
-mgr = ModelSearchManager(strategy="random", n_samples=5, n_jobs=-1, cv= 2)
-best_knn = mgr.search_model("knn", X, y)
-
-# genetic search
-mgr_gen = ModelSearchManager(strategy="genetic", n_samples=5,
-                             strategy_params={"population": 30, "elite_frac": 0.2}, n_jobs=-1, cv= 2)
-best_rf = mgr_gen.search_model("random_forest", X, y)
+if __name__ == "__main__":
+    X, y = load_iris(return_X_y=True)
+    manager = ModelSearchManager(strategy="genetic", scoring="accuracy")
+    results = manager.search_all((X, y), max_iters=5)
