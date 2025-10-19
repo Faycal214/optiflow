@@ -6,6 +6,7 @@ from typing import Dict, Any, Tuple
 from models.registry import MODEL_REGISTRY
 from core.optimization_engine import OptimizationEngine
 
+
 class ModelSearchManager:
     def __init__(self,
                  models_package: str = "models",
@@ -14,7 +15,8 @@ class ModelSearchManager:
                  scoring: str = "accuracy",
                  cv: int = 3,
                  n_jobs: int = -1,
-                 strategy_params: dict = None):
+                 strategy_params: dict = None,
+                 custom_metric_fn=None):
         self.models_package = models_package
         self.strategy = strategy
         self.n_samples = n_samples
@@ -22,8 +24,10 @@ class ModelSearchManager:
         self.cv = cv
         self.n_jobs = None if n_jobs == -1 else n_jobs
         self.strategy_params = strategy_params or {}
+        self.custom_metric_fn = custom_metric_fn
         self.model_configs = self._load_all_configs()
 
+    # ---------------- Auto-load all models ---------------- #
     def _load_all_configs(self) -> Dict[str, Any]:
         """Auto-load all model configs from the given package."""
         package = importlib.import_module(self.models_package)
@@ -35,6 +39,7 @@ class ModelSearchManager:
                     configs[obj.name] = obj
         return configs
 
+    # ---------------- Run for single model ---------------- #
     def search_model(self, model_name: str, dataset: Tuple, max_iters: int = 10):
         """Run optimization for a single model using OptimizationEngine."""
         if model_name not in self.model_configs:
@@ -47,10 +52,16 @@ class ModelSearchManager:
             dataset=dataset,
             metric=self.scoring
         )
+
+        # Optional custom metric
+        if self.custom_metric_fn:
+            engine.set_custom_metric(self.custom_metric_fn)
+
         model, params, score = engine.run(max_iters=max_iters)
         print(f"[DONE] {model_name} best_score={score:.4f}")
         return {"model": model, "params": params, "score": score}
 
+    # ---------------- Run for all registered models ---------------- #
     def search_all(self, dataset: Tuple, max_iters: int = 10):
         """Run optimization for all registered models."""
         results = []
@@ -59,7 +70,9 @@ class ModelSearchManager:
             res["model_name"] = model_name
             results.append(res)
 
-        results = sorted(results, key=lambda r: r["score"])
+        # Sort models by descending score
+        results = sorted(results, key=lambda r: r["score"], reverse=True)
+
         print("\n[SUMMARY] Best models:")
         for rank, r in enumerate(results, 1):
             print(f"{rank}. {r['model_name']} -> score={r['score']:.4f}")

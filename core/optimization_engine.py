@@ -1,9 +1,11 @@
 # core/optimization_engine.py
 import time
+from sklearn.metrics import accuracy_score, f1_score, mean_squared_error
 from models.registry import MODEL_REGISTRY
 from core.parallel_executor import ParallelExecutor
 from algorithms.genetic import GeneticOptimizer
 from algorithms.pso import PSOOptimizer
+
 
 class OptimizationEngine:
     def __init__(self, model_key: str, optimizer_key: str = "genetic", dataset=None, metric="accuracy"):
@@ -11,6 +13,7 @@ class OptimizationEngine:
         self.optimizer_key = optimizer_key.lower()
         self.dataset = dataset
         self.metric = metric
+        self.custom_metric_fn = None  # user-supplied callable
 
         cfg = MODEL_REGISTRY[model_key]
         self.search_space = cfg.build_search_space()
@@ -24,12 +27,32 @@ class OptimizationEngine:
         else:
             raise ValueError(f"Unknown optimizer: {self.optimizer_key}")
 
+    # ---------------- Metric Handling ---------------- #
+    def set_custom_metric(self, metric_fn):
+        """Allow user to provide their own custom metric function."""
+        self.custom_metric_fn = metric_fn
+
+    def _evaluate_metric(self, y_true, y_pred):
+        """Compute chosen metric."""
+        if self.custom_metric_fn:
+            return self.custom_metric_fn(y_true, y_pred)
+        m = self.metric.lower()
+        if m == "accuracy":
+            return accuracy_score(y_true, y_pred)
+        elif m == "f1":
+            return f1_score(y_true, y_pred, average="weighted")
+        elif m == "rmse":
+            return mean_squared_error(y_true, y_pred, squared=False)
+        else:
+            raise ValueError(f"Unsupported metric: {self.metric}")
+
+    # ---------------- Main Optimization ---------------- #
     def run(self, max_iters=10):
         X, y = self.dataset
         best = None
         total_start = time.time()
 
-        print(f"[Engine] Running {self.optimizer_key.upper()} optimization for {self.model_key}")
+        print(f"[Engine] Running {self.optimizer_key.upper()} optimization for {self.model_key} (metric={self.metric})")
         for it in range(max_iters):
             iter_start = time.time()
 
@@ -38,7 +61,15 @@ class OptimizationEngine:
             self.optimizer.update(results)
 
             for c in results:
-                if best is None or c.score < best.score:
+                try:
+                    preds = c.model.predict(X)
+                    score = self._evaluate_metric(y, preds)
+                    c.score = score
+                except Exception as e:
+                    print(f"[WARN] Evaluation failed: {e}")
+                    c.score = float("-inf")
+
+                if best is None or c.score > best.score:
                     best = c
 
             iter_time = time.time() - iter_start

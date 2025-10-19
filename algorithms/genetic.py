@@ -16,22 +16,17 @@ class GeneticOptimizer(BaseOptimizer):
         self.mutation_prob = mutation_prob
         self.rng = random.Random(seed)
 
-        # population of Candidate
+        # initialize random population
         self.population: List[Candidate] = [Candidate(self.space.sample()) for _ in range(self.pop_size)]
-        # after evaluation each candidate should have .score
 
     def suggest(self, n: int = None) -> List[Candidate]:
-        # if population un-evaluated return initial
         return list(self.population)
 
     def update(self, results: List[Candidate]):
-        # results: list of evaluated Candidate with .score (lower better)
-        # sort ascending by cost
         results = sorted(results, key=lambda c: c.score)
         elite_n = max(1, int(self.elite_frac * len(results)))
         elites = results[:elite_n]
 
-        # produce new population
         new_pop = elites.copy()
         while len(new_pop) < self.pop_size:
             parent_a = self._tournament_select(results)
@@ -41,7 +36,6 @@ class GeneticOptimizer(BaseOptimizer):
             new_pop.append(Candidate(child_params))
         self.population = new_pop
 
-    # ---------------- helpers ----------------
     def _tournament_select(self, population, k=3):
         pick = self.rng.sample(population, min(k, len(population)))
         return min(pick, key=lambda c: c.score)
@@ -49,10 +43,8 @@ class GeneticOptimizer(BaseOptimizer):
     def _crossover(self, a: dict, b: dict) -> dict:
         if self.rng.random() > self.crossover_prob:
             return copy.deepcopy(a) if self.rng.random() < 0.5 else copy.deepcopy(b)
-
         child = {}
         for key in a.keys():
-            # uniform crossover
             child[key] = copy.deepcopy(a[key]) if self.rng.random() < 0.5 else copy.deepcopy(b[key])
         return child
 
@@ -61,9 +53,11 @@ class GeneticOptimizer(BaseOptimizer):
         for k, info in self.space.parameters.items():
             if self.rng.random() > self.mutation_prob:
                 continue
+
             t = info["type"]
             if t == "categorical":
                 new[k] = self.rng.choice(info["values"])
+
             elif t == "discrete":
                 v = info["values"]
                 if isinstance(v, (list, tuple)):
@@ -71,12 +65,21 @@ class GeneticOptimizer(BaseOptimizer):
                 else:
                     low, high = v
                     new[k] = self.rng.randint(low, high)
-            else:  # continuous
+
+            elif t == "continuous":
                 low, high = info["values"]
                 log = info.get("log", False)
+
+                # safety for non-positive or invalid log ranges
+                if log and (low <= 0 or high <= 0):
+                    log = False  # disable log-scale if invalid
+
                 if log:
-                    new[k] = float(self.rng.uniform(math.log(low), math.log(high)))
-                    new[k] = math.exp(new[k])
+                    log_low = math.log(low)
+                    log_high = math.log(high)
+                    new_val = float(self.rng.uniform(log_low, log_high))
+                    new[k] = math.exp(new_val)
                 else:
                     new[k] = float(self.rng.uniform(low, high))
+
         return new
