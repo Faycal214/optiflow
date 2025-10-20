@@ -5,6 +5,8 @@ from models.registry import MODEL_REGISTRY
 from core.parallel_executor import ParallelExecutor
 from algorithms.genetic import GeneticOptimizer
 from algorithms.pso import PSOOptimizer
+from algorithms.bayesian import BayesianOptimizer
+from algorithms.simulated_annealing import SimulatedAnnealingOptimizer
 
 
 class OptimizationEngine:
@@ -22,10 +24,15 @@ class OptimizationEngine:
 
         if self.optimizer_key == "pso":
             self.optimizer = PSOOptimizer(self.search_space)
+        elif self.optimizer_key == "bayesian":
+            self.optimizer = BayesianOptimizer(self.search_space)
         elif self.optimizer_key == "genetic":
             self.optimizer = GeneticOptimizer(self.search_space)
+        elif self.optimizer_key == "simulated_annealing":
+            self.optimizer = SimulatedAnnealingOptimizer(self.search_space)
         else:
             raise ValueError(f"Unknown optimizer: {self.optimizer_key}")
+
 
     # ---------------- Metric Handling ---------------- #
     def set_custom_metric(self, metric_fn):

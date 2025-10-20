@@ -14,7 +14,7 @@ class DecisionTreeConfig:
         s.add("min_samples_split", "continuous", [1e-4, 0.9], log=True)
         s.add("min_samples_leaf", "continuous", [1e-4, 0.5], log=True)
         s.add("max_features", "categorical", ["sqrt", "log2", None])
-        s.add("ccp_alpha", "continuous", [0.0, 0.2], log=True)
+        s.add("ccp_alpha", "continuous", [0.0, 0.2], log=False)
         s.add("min_weight_fraction_leaf", "continuous", [0.0, 0.5])
         return s
 

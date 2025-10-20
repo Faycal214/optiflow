@@ -2,8 +2,8 @@ import random, math
 import numpy as np
 
 class SearchSpace:
-    def __init__(self):
-        self.parameters = {}
+    def __init__(self, parameters=None):
+        self.parameters = parameters or {}
 
     def add(self, name, param_type, values, log=False):
         assert param_type in ("continuous", "discrete", "categorical")

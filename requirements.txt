@@ -1,0 +1,8 @@
+scikit-optimize
+numpy 
+pandas
+math
+random
+pytorch
+scikit-learn
+scipy
