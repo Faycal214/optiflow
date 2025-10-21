@@ -7,7 +7,7 @@ from algorithms.genetic import GeneticOptimizer
 from algorithms.pso import PSOOptimizer
 from algorithms.bayesian import BayesianOptimizer
 from algorithms.simulated_annealing import SimulatedAnnealingOptimizer
-
+from algorithms.tpe import TPEOptimizer
 
 class OptimizationEngine:
     def __init__(self, model_key: str, optimizer_key: str = "genetic", dataset=None, metric="accuracy"):
@@ -30,6 +30,8 @@ class OptimizationEngine:
             self.optimizer = GeneticOptimizer(self.search_space)
         elif self.optimizer_key == "simulated_annealing":
             self.optimizer = SimulatedAnnealingOptimizer(self.search_space)
+        elif self.optimizer_key == "tpe":
+            self.optimizer = TPEOptimizer(self.search_space)
         else:
             raise ValueError(f"Unknown optimizer: {self.optimizer_key}")
 
