@@ -10,9 +10,9 @@ X, y = load_breast_cancer(return_X_y=True)
 
 manager = ModelSearchManager(
     scoring="accuracy",            # or "accuracy", "rmse"
-    strategy="random_search",        # or "genetic", "pso"
+    strategy="grid_search",        # or "genetic", "pso"
     custom_metric_fn=None    # or custom_macro_f1
 )
 
 # manager.search_all((X, y), max_iters=5)
-manager.search_model("decision_tree", (X, y), max_iters=10)
+manager.search_model("decision_tree", (X, y), max_iters=500)

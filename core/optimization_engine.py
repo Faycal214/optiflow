@@ -48,18 +48,40 @@ class OptimizationEngine:
         self.custom_metric_fn = metric_fn
 
     def _evaluate_metric(self, y_true, y_pred):
-        """Compute chosen metric."""
-        if self.custom_metric_fn:
-            return self.custom_metric_fn(y_true, y_pred)
-        m = self.metric.lower()
+        """
+        Compute chosen metric. Supports classic metrics and custom callable.
+        """
+        metric = self.custom_metric_fn if callable(self.custom_metric_fn) else self.metric
+        if callable(metric):
+            return metric(y_true, y_pred)
+        m = str(metric).lower()
         if m == "accuracy":
+            from sklearn.metrics import accuracy_score
             return accuracy_score(y_true, y_pred)
         elif m == "f1":
+            from sklearn.metrics import f1_score
             return f1_score(y_true, y_pred, average="weighted")
-        elif m == "rmse":
-            return mean_squared_error(y_true, y_pred, squared=False)
+        elif m == "precision":
+            from sklearn.metrics import precision_score
+            return precision_score(y_true, y_pred, average="weighted")
+        elif m == "recall":
+            from sklearn.metrics import recall_score
+            return recall_score(y_true, y_pred, average="weighted")
+        elif m == "roc_auc":
+            from sklearn.metrics import roc_auc_score
+            try:
+                if hasattr(y_pred, "shape") and len(y_pred.shape) > 1:
+                    return roc_auc_score(y_true, y_pred, multi_class="ovr")
+                else:
+                    return roc_auc_score(y_true, y_pred)
+            except Exception as e:
+                print(f"[Engine] ROC AUC error: {e}")
+                return float('-inf')
+        elif m == "log_loss":
+            from sklearn.metrics import log_loss
+            return log_loss(y_true, y_pred)
         else:
-            raise ValueError(f"Unsupported metric: {self.metric}")
+            raise ValueError(f"Unsupported metric: {self.metric}. Supported: accuracy, f1, precision, recall, roc_auc, log_loss or a custom callable.")
 
     # ---------------- Main Optimization ---------------- #
     def run(self, max_iters=10):
@@ -68,6 +90,12 @@ class OptimizationEngine:
         total_start = time.time()
 
         print(f"[Engine] Running {self.optimizer_key.upper()} optimization for {self.model_key} (metric={self.metric})")
+        # Log metric type only once
+        metric = self.custom_metric_fn if callable(self.custom_metric_fn) else self.metric
+        if callable(metric):
+            print("[Engine] Using custom metric function.")
+        else:
+            print(f"[Engine] Using built-in metric: {str(metric).lower()}")
         for it in range(max_iters):
             iter_start = time.time()
 

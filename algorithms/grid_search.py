@@ -11,21 +11,29 @@ def _expand_values(name, info, n_per_cont=5):
     if t == "categorical":
         return list(v)
     if t == "discrete":
-        if isinstance(v, (list, tuple)):
-            # explicit list
-            return list(v)
-        low, high = v
-        # limit grid size
-        high = min(high, low + 200)
-        return list(range(low, high + 1))
+        # If v is a tuple/list of two ints, treat as range
+        if isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, int) for x in v):
+            low, high = v
+            if n_per_cont > 1:
+                vals = np.linspace(low, high, n_per_cont)
+                vals = [int(round(x)) for x in vals]
+                # Ensure endpoints are included and values are unique
+                vals = sorted(set([low] + vals + [high]))
+                return vals
+            else:
+                return [low, high]
+        # If v is a list of values, use as is
+        return list(v)
     # continuous
-    low, high = v
-    if log:
-        return list(np.exp(np.linspace(math.log(low), math.log(high), n_per_cont)))
-    return list(np.linspace(low, high, n_per_cont))
+    if isinstance(v, (list, tuple)) and len(v) == 2:
+        low, high = v
+        if log:
+            return list(np.exp(np.linspace(math.log(low), math.log(high), n_per_cont)))
+        return list(np.linspace(low, high, n_per_cont))
+    return [v]
 
 class GridSearchOptimizer(BaseOptimizer):
-    def __init__(self, search_space: SearchSpace, n_per_cont: int = 5):
+    def __init__(self, search_space: SearchSpace, n_per_cont: int = 10):
         self.space = search_space
         self.n_per_cont = n_per_cont
         self._grid = None
@@ -35,15 +43,22 @@ class GridSearchOptimizer(BaseOptimizer):
     def _build_grid(self):
         params = self.space.parameters
         keys = list(params.keys())
-        lists = [_expand_values(k, params[k], self.n_per_cont) for k in keys]
+        lists = []
+        for k in keys:
+            expanded = _expand_values(k, params[k], self.n_per_cont)
+            print(f"[GridSearch] Expanded values for {k}: {expanded}")
+            lists.append(expanded)
         combos = []
         for tup in itertools.product(*lists):
             combos.append({k: tup[i] for i, k in enumerate(keys)})
+        import random
+        random.shuffle(combos)
         self._grid = combos
 
     def suggest(self, n: int = 1) -> List[Candidate]:
         """
         Suggest n candidates from the grid. If n is None, default to 1.
+        Print parameter sets for debugging.
         """
         if n is None:
             n = 1
@@ -51,7 +66,9 @@ class GridSearchOptimizer(BaseOptimizer):
         for _ in range(n):
             if self._idx >= len(self._grid):
                 break
-            out.append(Candidate(self._grid[self._idx]))
+            params = self._grid[self._idx]
+            print(f"[GridSearch] Iter {self._idx+1}: {params}")
+            out.append(Candidate(params))
             self._idx += 1
         return out
 
