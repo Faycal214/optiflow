@@ -42,6 +42,11 @@ class GridSearchOptimizer(BaseOptimizer):
         self._grid = combos
 
     def suggest(self, n: int = 1) -> List[Candidate]:
+        """
+        Suggest n candidates from the grid. If n is None, default to 1.
+        """
+        if n is None:
+            n = 1
         out = []
         for _ in range(n):
             if self._idx >= len(self._grid):

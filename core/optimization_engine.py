@@ -8,6 +8,8 @@ from algorithms.pso import PSOOptimizer
 from algorithms.bayesian import BayesianOptimizer
 from algorithms.simulated_annealing import SimulatedAnnealingOptimizer
 from algorithms.tpe import TPEOptimizer
+from algorithms.grid_search import GridSearchOptimizer
+from algorithms.random_search import RandomSearchOptimizer
 
 class OptimizationEngine:
     def __init__(self, model_key: str, optimizer_key: str = "genetic", dataset=None, metric="accuracy"):
@@ -32,6 +34,10 @@ class OptimizationEngine:
             self.optimizer = SimulatedAnnealingOptimizer(self.search_space)
         elif self.optimizer_key == "tpe":
             self.optimizer = TPEOptimizer(self.search_space)
+        elif self.optimizer_key == "grid_search":
+            self.optimizer = GridSearchOptimizer(self.search_space)
+        elif self.optimizer_key == "random_search":
+            self.optimizer = RandomSearchOptimizer(self.search_space)
         else:
             raise ValueError(f"Unknown optimizer: {self.optimizer_key}")
 
