@@ -50,7 +50,8 @@ class ModelSearchManager:
             model_key=model_name,
             optimizer_key=self.strategy,
             dataset=dataset,
-            metric=self.scoring
+            metric=self.scoring,
+            strategy_params=self.strategy_params
         )
 
         # Optional custom metric
@@ -58,7 +59,10 @@ class ModelSearchManager:
             engine.set_custom_metric(self.custom_metric_fn)
 
         model, params, score = engine.run(max_iters=max_iters)
-        print(f"[DONE] {model_name} best_score={score:.4f}")
+        if score is not None:
+            print(f"[DONE] {model_name} best_score={score:.4f}")
+        else:
+            print(f"[DONE] {model_name} best_score=None")
         return {"model": model, "params": params, "score": score}
 
     # ---------------- Run for all registered models ---------------- #

@@ -1,33 +1,38 @@
+
 import optuna
-from core.base_optimizer import BaseOptimizer, Candidate
 
+class TPEOptimizer:
+    class Candidate:
+        def __init__(self, params):
+            self.params = params
+            self.score = None
+            self.model = None
+            self.trial = None
 
-from typing import Any, Dict, List, Optional, Tuple
-
-class TPEOptimizer(BaseOptimizer):
-    """
-    Tree-structured Parzen Estimator (TPE) optimizer using Optuna.
-    Handles int, float, and categorical parameters from SearchSpace.
-    """
-    def __init__(self, search_space, metric: str = "accuracy", population_size: int = 10):
-        super().__init__()
+    def __init__(self, search_space, metric, model_class, X, y, population_size=10):
         self.search_space = search_space
         self.metric = metric
+        self.model_class = model_class
+        self.X = X
+        self.y = y
         self.population_size = population_size
         self.study = optuna.create_study(direction="maximize")
-        self.trials: List[Tuple[Dict[str, Any], float]] = []
+        self.trials = []
+        self.iteration = 0
+        self.best_candidate = None
 
-    def _define_search_space(self, trial: optuna.trial.Trial) -> Dict[str, Any]:
-        """
-        Suggest parameters for a trial based on SearchSpace definition.
-        """
+    def initialize_population(self):
+        self.trials = []
+        self.iteration = 0
+        self.best_candidate = None
+
+    def _define_search_space(self, trial):
         params = {}
         for name, cfg in self.search_space.parameters.items():
             ptype = cfg["type"]
             values = cfg["values"]
             log = cfg.get("log", False)
             if ptype == "int" or ptype == "discrete":
-                # Discrete: range or list
                 if isinstance(values, (list, tuple)) and len(values) == 2 and all(isinstance(x, int) for x in values):
                     params[name] = trial.suggest_int(name, values[0], values[1], log=log)
                 else:
@@ -40,40 +45,56 @@ class TPEOptimizer(BaseOptimizer):
                 raise ValueError(f"[TPE] Unsupported parameter type: {ptype} for {name}")
         return params
 
-    def suggest(self, history: Optional[List[Candidate]] = None) -> List[Candidate]:
-        """
-        Suggest a batch of candidates by sampling parameters from Optuna.
-        """
-        print("[TPE] Suggesting new parameters...")
+    def generate_candidates(self):
         candidates = []
         for _ in range(self.population_size):
             trial = self.study.ask()
             params = self._define_search_space(trial)
-            candidate = Candidate(params=params)
-            candidate.trial = trial  # Attach trial object for later use
+            candidate = self.Candidate(params=params)
+            candidate.trial = trial
             candidates.append(candidate)
         return candidates
 
-    def update(self, results: List[Candidate]) -> None:
-        """
-        Update Optuna study with evaluated candidate results.
-        """
-        for i, candidate in enumerate(results, 1):
+    def evaluate_candidates(self, candidates):
+        for cand in candidates:
+            try:
+                model = self.model_class(**cand.params)
+                model.fit(self.X, self.y)
+                preds = model.predict(self.X)
+                if callable(self.metric):
+                    score = self.metric(self.y, preds)
+                else:
+                    from sklearn.metrics import get_scorer
+                    score = get_scorer(self.metric)(model, self.X, self.y)
+                cand.score = score
+                cand.model = model
+            except Exception:
+                cand.score = float('-inf')
+                cand.model = None
+
+    def update_state(self, candidates):
+        for candidate in candidates:
             score = candidate.score
             trial = getattr(candidate, "trial", None)
             if trial is not None:
                 self.study.tell(trial, score)
-            else:
-                print(f"[TPE] Warning: Candidate missing trial object, skipping Optuna tell.")
             self.trials.append((candidate.params, score))
-            print(f"[TPE] Completed iteration {i}/{len(results)} with score={score}")
+        best = max(candidates, key=lambda c: c.score if c.score is not None else float('-inf'))
+        if self.best_candidate is None or best.score > self.best_candidate.score:
+            self.best_candidate = best
 
-    def get_best(self) -> Tuple[Optional[Any], Optional[Dict[str, Any]], Optional[float]]:
-        """
-        Return best parameters and score found so far.
-        """
-        if not self.trials:
-            return None, None, None
-        best_params, best_score = max(self.trials, key=lambda x: x[1])
-        # Model instantiation is handled by OptimizationEngine
-        return None, best_params, best_score
+    def run(self, max_iters=10):
+        import time
+        self.initialize_population()
+        start_time = time.time()
+        for i in range(max_iters):
+            candidates = self.generate_candidates()
+            self.evaluate_candidates(candidates)
+            self.update_state(candidates)
+            scores = [c.score for c in candidates]
+            print(f"[Engine] Iter {i+1}/{max_iters} | Best={self.best_candidate.score:.4f} | Time={time.time()-start_time:.2f}s")
+            self.iteration += 1
+        print(f"[Engine] Optimization finished in {time.time()-start_time:.2f}s")
+        if self.best_candidate is not None:
+            return self.best_candidate.params, self.best_candidate.score
+        return None, None

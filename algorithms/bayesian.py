@@ -1,94 +1,127 @@
 # algorithms/bayesian.py
 import random
 from typing import List
-from core.base_optimizer import BaseOptimizer, Candidate
-from core.search_space import SearchSpace
+
 from skopt import Optimizer as SkOptimizer
 from skopt.space import Real, Integer, Categorical
 
+class BayesianOptimizer:
+    class Candidate:
+        def __init__(self, params):
+            self.params = params
+            self.score = None
+            self.model = None
 
-class BayesianOptimizer(BaseOptimizer):
-    def __init__(self, search_space: SearchSpace, n_initial_points: int = 5, random_state: int = None):
-        self.space = search_space
+    def __init__(self, search_space, metric, model_class, X, y, n_initial_points=5, random_state=None):
+        self.search_space = search_space
+        self.metric = metric
+        self.model_class = model_class
+        self.X = X
+        self.y = y
         self.n_initial_points = n_initial_points
         self.random_state = random_state or 42
-
-        # convert search space to skopt format
         self.sk_space = self._to_skopt_space()
         self.optimizer = SkOptimizer(
             dimensions=self.sk_space,
             random_state=self.random_state,
             n_initial_points=self.n_initial_points
         )
+        self.trials = []
+        self.results = []
+        self.iteration = 0
+        self.best_candidate = None
 
-        # store evaluated points
-        self.trials = []  # <— missing before
-        self.results = []  # optional tracking
+    def initialize_population(self):
+        self.trials = []
+        self.results = []
+        self.iteration = 0
+        self.best_candidate = None
 
-    def suggest(self, n: int = None) -> List[Candidate]:
-        # initial samples if no prior evaluations
+    def generate_candidates(self):
         if len(self.trials) == 0:
-            samples = [self.space.sample() for _ in range(self.n_initial_points)]
-            return [Candidate(s) for s in samples]
-
-        # Bayesian suggestion from skopt
-        suggestions = self.optimizer.ask(n_points=n or 1)
-        param_names = list(self.space.parameters.keys())
+            samples = [self.search_space.sample() for _ in range(self.n_initial_points)]
+            return [self.Candidate(s) for s in samples]
+        suggestions = self.optimizer.ask(n_points=1)
+        param_names = list(self.search_space.parameters.keys())
         candidates = []
         for s in suggestions:
             cand_params = dict(zip(param_names, s))
-            candidates.append(Candidate(cand_params))
+            candidates.append(self.Candidate(cand_params))
         return candidates
 
-    def update(self, results: List[Candidate]):
-        for cand in results:
-            x = [cand.params[k] for k in self.space.parameters.keys()]
-            y = -cand.score
+    def evaluate_candidates(self, candidates):
+        for cand in candidates:
+            try:
+                model = self.model_class(**cand.params)
+                model.fit(self.X, self.y)
+                preds = model.predict(self.X)
+                if callable(self.metric):
+                    score = self.metric(self.y, preds)
+                else:
+                    from sklearn.metrics import get_scorer
+                    score = get_scorer(self.metric)(model, self.X, self.y)
+                cand.score = score
+                cand.model = model
+            except Exception:
+                cand.score = float('-inf')
+                cand.model = None
 
-            # --- Sanitize parameters to ensure they are in space bounds ---
+    def update_state(self, candidates):
+        for cand in candidates:
+            x = [cand.params[k] for k in self.search_space.parameters.keys()]
+            y = -cand.score
             x_clean = []
-            for xi, (name, info) in zip(x, self.space.parameters.items()):
+            for xi, (name, info) in zip(x, self.search_space.parameters.items()):
                 t = info["type"]
                 v = info["values"]
-
                 if t in ["continuous", "int"]:
                     low, high = v
-                    # clamp numeric values into range
                     xi = max(min(xi, high), low)
                 elif t in ["categorical", "discrete"]:
                     if xi not in v:
                         xi = random.choice(v)
                 x_clean.append(xi)
-            # -------------------------------------------------------------
-
             self.trials.append((x_clean, y))
             self.optimizer.tell(x_clean, y)
-        self.results.extend(results)
+        self.results.extend(candidates)
+        best = max(candidates, key=lambda c: c.score if c.score is not None else float('-inf'))
+        if self.best_candidate is None or best.score > self.best_candidate.score:
+            self.best_candidate = best
 
+    def run(self, max_iters=10):
+        import time
+        self.initialize_population()
+        start_time = time.time()
+        for i in range(max_iters):
+            candidates = self.generate_candidates()
+            self.evaluate_candidates(candidates)
+            self.update_state(candidates)
+            scores = [c.score for c in candidates]
+            print(f"[Engine] Iter {i+1}/{max_iters} | Best={self.best_candidate.score:.4f} | Time={time.time()-start_time:.2f}s")
+            self.iteration += 1
+        print(f"[Engine] Optimization finished in {time.time()-start_time:.2f}s")
+        if self.best_candidate is not None:
+            return self.best_candidate.params, self.best_candidate.score
+        return None, None
 
     def _to_skopt_space(self):
         out = []
-        for name, info in self.space.parameters.items():
+        for name, info in self.search_space.parameters.items():
             t = info["type"]
             v = info["values"]
             log = info.get("log", False)
-
             if t == "continuous":
                 low, high = v
                 if log and (low <= 0 or high <= 0):
                     log = False
                 out.append(Real(low, high, prior="log-uniform" if log else "uniform", name=name))
-
             elif t == "int":
                 low, high = v
                 out.append(Integer(low, high, name=name))
-
             elif t == "discrete":
                 out.append(Categorical(v, name=name))
-
             elif t == "categorical":
                 out.append(Categorical(v, name=name))
-
             else:
                 raise ValueError(f"Unknown parameter type {t} for {name}")
         return out
