@@ -2,8 +2,8 @@
 import random
 import math
 from typing import List
-from core.base_optimizer import BaseOptimizer, Candidate
-from core.search_space import SearchSpace
+from optiflow.core.base_optimizer import BaseOptimizer, Candidate
+from optiflow.core.search_space import SearchSpace
 
 # Standalone GeneticOptimizer
 import copy

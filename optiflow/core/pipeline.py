@@ -1,5 +1,5 @@
 # core/pipeline.py
-from core.optimization_engine import OptimizationEngine
+from optiflow.core.optimization_engine import OptimizationEngine
 
 class MLPipeline:
     def __init__(self, model_key, dataset, optimizer="genetic", metric="accuracy"):

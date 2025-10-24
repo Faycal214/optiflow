@@ -3,8 +3,8 @@ import importlib
 import inspect
 import pkgutil
 from typing import Dict, Any, Tuple
-from models.registry import MODEL_REGISTRY
-from core.optimization_engine import OptimizationEngine
+from optiflow.models.registry import MODEL_REGISTRY
+from optiflow.core.optimization_engine import OptimizationEngine
 
 
 class ModelSearchManager:

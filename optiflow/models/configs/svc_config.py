@@ -1,8 +1,8 @@
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from core.search_space import SearchSpace
-from core.model_wrapper import ModelWrapper
+from optiflow.core.search_space import SearchSpace
+from optiflow.core.model_wrapper import ModelWrapper
 
 
 # Define this function at module level, not nested

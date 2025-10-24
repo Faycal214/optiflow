@@ -1,5 +1,5 @@
 # tools/test_registry.py
-from models import get_model_config
+from optiflow.models import get_model_config
 
 def test():
     for key in ["svc", "random_forest", "mlp", "decision_tree", "knn", "logistic_regression", "xgboost"]:

@@ -1,8 +1,8 @@
 # core/optimization_engine.py
 import time
 from sklearn.metrics import accuracy_score, f1_score, mean_squared_error
-from models.registry import MODEL_REGISTRY
-from core.parallel_executor import ParallelExecutor
+from optiflow.models.registry import MODEL_REGISTRY
+from optiflow.core.parallel_executor import ParallelExecutor
 from optimizers.genetic import GeneticOptimizer
 from optimizers.pso import PSOOptimizer
 from optimizers.bayesian import BayesianOptimizer

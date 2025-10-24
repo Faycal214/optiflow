@@ -1,6 +1,6 @@
 from xgboost import XGBClassifier
-from core.search_space import SearchSpace
-from core.model_wrapper import ModelWrapper
+from optiflow.core.search_space import SearchSpace
+from optiflow.core.model_wrapper import ModelWrapper
 
 class XGBoostConfig:
     name = "xgboost"

@@ -1,6 +1,6 @@
 from multiprocessing import Pool
 from typing import List
-from core.base_optimizer import Candidate
+from optiflow.core.base_optimizer import Candidate
 import os
 
 def _eval_candidate_worker(args):

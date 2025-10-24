@@ -1,6 +1,6 @@
 from sklearn.linear_model import LinearRegression
-from core.search_space import SearchSpace
-from core.model_wrapper import ModelWrapper
+from optiflow.core.search_space import SearchSpace
+from optiflow.core.model_wrapper import ModelWrapper
 
 class LinearRegressionConfig:
     name = "linear_regression"

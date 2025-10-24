@@ -1,11 +1,11 @@
 from sklearn.datasets import load_iris, make_classification
-from optimizers.genetic import GeneticOptimizer
-from optimizers.pso import PSOOptimizer
-from optimizers.bayesian import BayesianOptimizer
-from optimizers.tpe import TPEOptimizer
-from optimizers.random_search import RandomSearchOptimizer
-from optimizers.simulated_annealing import SimulatedAnnealingOptimizer
-from models.configs.random_forest_config import RandomForestConfig
+from optiflow.optimizers.genetic import GeneticOptimizer
+from optiflow.optimizers.pso import PSOOptimizer
+from optiflow.optimizers.bayesian import BayesianOptimizer
+from optiflow.optimizers.tpe import TPEOptimizer
+from optiflow.optimizers.random_search import RandomSearchOptimizer
+from optiflow.optimizers.simulated_annealing import SimulatedAnnealingOptimizer
+from optiflow.models.configs.random_forest_config import RandomForestConfig
 
 # Custom metric example (macro F1)
 def custom_macro_f1(y_true, y_pred):

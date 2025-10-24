@@ -1,6 +1,6 @@
 # examples/run_iris.py
 from sklearn.datasets import load_iris
-from core.optimization_engine import OptimizationEngine
+from optiflow.core.optimization_engine import OptimizationEngine
 
 iris = load_iris()
 X = iris.data
