@@ -1,10 +1,10 @@
 from sklearn.datasets import load_iris
-from algorithms.genetic import GeneticOptimizer
-from algorithms.pso import PSOOptimizer
-from algorithms.bayesian import BayesianOptimizer
-from algorithms.tpe import TPEOptimizer
-from algorithms.random_search import RandomSearchOptimizer
-from algorithms.simulated_annealing import SimulatedAnnealingOptimizer
+from optimizers.genetic import GeneticOptimizer
+from optimizers.pso import PSOOptimizer
+from optimizers.bayesian import BayesianOptimizer
+from optimizers.tpe import TPEOptimizer
+from optimizers.random_search import RandomSearchOptimizer
+from optimizers.simulated_annealing import SimulatedAnnealingOptimizer
 from models.configs.decision_tree_config import DecisionTreeConfig
 
 # Custom metric example (macro F1)

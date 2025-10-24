@@ -1,4 +1,4 @@
-# algorithms/genetic.py
+# optimizers/genetic.py
 import random
 import math
 from typing import List

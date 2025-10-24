@@ -3,12 +3,12 @@ import time
 from sklearn.metrics import accuracy_score, f1_score, mean_squared_error
 from models.registry import MODEL_REGISTRY
 from core.parallel_executor import ParallelExecutor
-from algorithms.genetic import GeneticOptimizer
-from algorithms.pso import PSOOptimizer
-from algorithms.bayesian import BayesianOptimizer
-from algorithms.simulated_annealing import SimulatedAnnealingOptimizer
-from algorithms.tpe import TPEOptimizer
-from algorithms.random_search import RandomSearchOptimizer
+from optimizers.genetic import GeneticOptimizer
+from optimizers.pso import PSOOptimizer
+from optimizers.bayesian import BayesianOptimizer
+from optimizers.simulated_annealing import SimulatedAnnealingOptimizer
+from optimizers.tpe import TPEOptimizer
+from optimizers.random_search import RandomSearchOptimizer
 
 class OptimizationEngine:
     def __init__(self, model_key: str, optimizer_key: str = "genetic", dataset=None, metric="accuracy", strategy_params=None):

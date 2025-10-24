@@ -1,4 +1,4 @@
-# algorithms/random_search.py
+# optimizers/random_search.py
 import random
 from typing import List
 

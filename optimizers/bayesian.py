@@ -1,4 +1,4 @@
-# algorithms/bayesian.py
+# optimizers/bayesian.py
 import random
 from typing import List
 
