@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 class PSOOptimizer:
-    def __init__(self, search_space, metric, model_class, X, y, n_particles=20, w=0.7, c1=1.4, c2=1.4, velocity_threshold=1e-3, stagnation_limit=5):
+    def __init__(self, search_space, metric, model_class, X, y, n_particles=20, w=0.7, c1=1.4, c2=1.4, velocity_threshold=1e-3, stagnation_limit=10):
         self.search_space = search_space
         self.metric = metric
         self.model_class = model_class
@@ -119,10 +119,10 @@ class PSOOptimizer:
                 best_score = score
                 best_params = params
         if best_params is not None:
-            print(f"[PSO] Returning best_params: {best_params}, best_score: {best_score}")
+            print(f"Result for pso: score={best_score:.4f}, params={best_params}")
             return best_params, best_score
         else:
-            print("[PSO] No valid candidate found, returning fallback.")
+            print("Result for pso: score=-inf, params={}")
             return {}, float('-inf')
 
     def _update_state(self, candidates, scores=None):
@@ -201,36 +201,42 @@ class PSOOptimizer:
         import time
         self.initialize_population()
         start_time = time.time()
+        self.best_candidate = None
         for i in range(max_iters):
             self.evaluate_particles()
+            # Find best candidate in current population
+            best_score = float('-inf')
+            best_params = None
+            for particle in self.particles:
+                params = self._decode_position(particle.position)
+                try:
+                    model = self.model_class(**params)
+                    model.fit(self.X, self.y)
+                    preds = model.predict(self.X)
+                    if callable(self.metric):
+                        score = self.metric(self.y, preds)
+                    else:
+                        from sklearn.metrics import get_scorer
+                        score = get_scorer(self.metric)(model, self.X, self.y)
+                except Exception:
+                    score = float('-inf')
+                if score > best_score:
+                    best_score = score
+                    best_params = params
+            # Update best_candidate
+            if self.best_candidate is None or best_score > self.best_candidate.score:
+                class Candidate:
+                    def __init__(self, params, score):
+                        self.params = params
+                        self.score = score
+                self.best_candidate = Candidate(best_params, best_score)
             self.update_particles()
-            print(f"[Engine] Iter {i+1}/{max_iters} | Best={self.global_best_score:.4f} | Time={time.time()-start_time:.2f}s")
+            print(f"[Engine] Iter {i+1}/{max_iters} | Best={self.best_candidate.score:.4f} | Time={time.time()-start_time:.2f}s\n")
             if self._no_improve_count >= self.stagnation_limit:
                 print("[Engine] Stopping early due to stagnation.")
                 break
         print(f"[Engine] Optimization finished in {time.time()-start_time:.2f}s")
-        # Find best candidate by evaluating all particles
-        best_params = None
-        best_score = float('-inf')
-        for particle in self.particles:
-            params = self._decode_position(particle.position)
-            try:
-                model = self.model_class(**params)
-                model.fit(self.X, self.y)
-                preds = model.predict(self.X)
-                if callable(self.metric):
-                    score = self.metric(self.y, preds)
-                else:
-                    from sklearn.metrics import get_scorer
-                    score = get_scorer(self.metric)(model, self.X, self.y)
-            except Exception:
-                score = float('-inf')
-            if score > best_score:
-                best_score = score
-                best_params = params
-        if best_params is not None:
-            print(f"[PSO] Returning best_params: {best_params}, best_score: {best_score}")
-            return best_params, best_score
+        if self.best_candidate is not None:
+            return self.best_candidate.params, self.best_candidate.score
         else:
-            print("[PSO] No valid candidate found, returning fallback.")
             return {}, float('-inf')

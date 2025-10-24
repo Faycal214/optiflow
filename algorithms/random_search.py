@@ -9,7 +9,7 @@ class RandomSearchOptimizer:
             self.score = None
             self.model = None
 
-    def __init__(self, search_space, metric, model_class, X, y, n_samples=5000, seed=None):
+    def __init__(self, search_space, metric, model_class, X, y, n_samples=10000, seed=None, stagnation_limit=10):
         self.search_space = search_space
         self.metric = metric
         self.model_class = model_class
@@ -19,10 +19,13 @@ class RandomSearchOptimizer:
         self.rng = random.Random(seed)
         self.best_candidate = None
         self.iteration = 0
+        self.stagnation_limit = stagnation_limit
+        self._no_improve_count = 0
 
     def initialize_population(self):
         self.iteration = 0
         self.best_candidate = None
+        self._no_improve_count = 0
 
     def generate_candidates(self):
         return [self.Candidate(self.search_space.sample()) for _ in range(self.n_samples)]
@@ -48,6 +51,9 @@ class RandomSearchOptimizer:
         best = max(candidates, key=lambda c: c.score if c.score is not None else float('-inf'))
         if self.best_candidate is None or best.score > self.best_candidate.score:
             self.best_candidate = best
+            self._no_improve_count = 0
+        else:
+            self._no_improve_count += 1
 
     def run(self, max_iters=10):
         import time
@@ -60,6 +66,9 @@ class RandomSearchOptimizer:
             scores = [c.score for c in candidates]
             print(f"[Engine] Iter {i+1}/{max_iters} | Best={self.best_candidate.score:.4f} | Time={time.time()-start_time:.2f}s")
             self.iteration += 1
+            if self._no_improve_count >= self.stagnation_limit:
+                print("[Engine] Stopping early due to stagnation.")
+                break
         print(f"[Engine] Optimization finished in {time.time()-start_time:.2f}s")
         if self.best_candidate is not None:
             return self.best_candidate.params, self.best_candidate.score

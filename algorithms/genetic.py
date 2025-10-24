@@ -16,7 +16,7 @@ class GeneticOptimizer:
             self.model = None
 
     def __init__(self, search_space, metric, model_class, X, y, population=20, elite_frac=0.2,
-                 crossover_prob=0.8, mutation_prob=0.2, seed=None, stagnation_limit=5):
+                 crossover_prob=0.8, mutation_prob=0.2, seed=None, stagnation_limit=10):
         self.search_space = search_space
         self.metric = metric
         self.model_class = model_class

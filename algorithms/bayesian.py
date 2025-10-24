@@ -12,7 +12,7 @@ class BayesianOptimizer:
             self.score = None
             self.model = None
 
-    def __init__(self, search_space, metric, model_class, X, y, n_initial_points=5, random_state=None):
+    def __init__(self, search_space, metric, model_class, X, y, n_initial_points=5, random_state=None, stagnation_limit=10):
         self.search_space = search_space
         self.metric = metric
         self.model_class = model_class
@@ -30,12 +30,15 @@ class BayesianOptimizer:
         self.results = []
         self.iteration = 0
         self.best_candidate = None
+        self.stagnation_limit = stagnation_limit
+        self._no_improve_count = 0
 
     def initialize_population(self):
         self.trials = []
         self.results = []
         self.iteration = 0
         self.best_candidate = None
+        self._no_improve_count = 0
 
     def generate_candidates(self):
         if len(self.trials) == 0:
@@ -78,9 +81,27 @@ class BayesianOptimizer:
                     low, high = v
                     xi = max(min(xi, high), low)
                 elif t in ["categorical", "discrete"]:
-                    if xi not in v:
-                        xi = random.choice(v)
-                x_clean.append(xi)
+                    pass
+            # Stagnation logic
+            if self.best_candidate is None or cand.score > self.best_candidate.score:
+                self.best_candidate = cand
+                self._no_improve_count = 0
+            else:
+                self._no_improve_count += 1
+            # Properly encode x_clean for skopt
+            x_clean = []
+            for name, info in self.search_space.parameters.items():
+                val = cand.params[name]
+                t = info["type"]
+                v = info["values"]
+                # If categorical/discrete and val is None, replace with 'none' or first valid value
+                if (t == "categorical" or t == "discrete"):
+                    if val is None:
+                        val = 'none' if 'none' in v else v[0]
+                    # If value not in allowed values, use first valid value
+                    if val not in v:
+                        val = v[0]
+                x_clean.append(val)
             self.trials.append((x_clean, y))
             self.optimizer.tell(x_clean, y)
         self.results.extend(candidates)
@@ -99,6 +120,9 @@ class BayesianOptimizer:
             scores = [c.score for c in candidates]
             print(f"[Engine] Iter {i+1}/{max_iters} | Best={self.best_candidate.score:.4f} | Time={time.time()-start_time:.2f}s")
             self.iteration += 1
+            if self._no_improve_count >= self.stagnation_limit:
+                print("[Engine] Stopping early due to stagnation.")
+                break
         print(f"[Engine] Optimization finished in {time.time()-start_time:.2f}s")
         if self.best_candidate is not None:
             return self.best_candidate.params, self.best_candidate.score

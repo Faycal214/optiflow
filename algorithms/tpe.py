@@ -9,7 +9,7 @@ class TPEOptimizer:
             self.model = None
             self.trial = None
 
-    def __init__(self, search_space, metric, model_class, X, y, population_size=10):
+    def __init__(self, search_space, metric, model_class, X, y, population_size=10, stagnation_limit=10):
         self.search_space = search_space
         self.metric = metric
         self.model_class = model_class
@@ -20,11 +20,14 @@ class TPEOptimizer:
         self.trials = []
         self.iteration = 0
         self.best_candidate = None
+        self.stagnation_limit = stagnation_limit
+        self._no_improve_count = 0
 
     def initialize_population(self):
         self.trials = []
         self.iteration = 0
         self.best_candidate = None
+        self._no_improve_count = 0
 
     def _define_search_space(self, trial):
         params = {}
@@ -78,6 +81,12 @@ class TPEOptimizer:
             trial = getattr(candidate, "trial", None)
             if trial is not None:
                 self.study.tell(trial, score)
+            # Stagnation logic
+            if self.best_candidate is None or score > self.best_candidate.score:
+                self.best_candidate = candidate
+                self._no_improve_count = 0
+            else:
+                self._no_improve_count += 1
             self.trials.append((candidate.params, score))
         best = max(candidates, key=lambda c: c.score if c.score is not None else float('-inf'))
         if self.best_candidate is None or best.score > self.best_candidate.score:
@@ -94,6 +103,9 @@ class TPEOptimizer:
             scores = [c.score for c in candidates]
             print(f"[Engine] Iter {i+1}/{max_iters} | Best={self.best_candidate.score:.4f} | Time={time.time()-start_time:.2f}s")
             self.iteration += 1
+            if self._no_improve_count >= self.stagnation_limit:
+                print("[Engine] Stopping early due to stagnation.")
+                break
         print(f"[Engine] Optimization finished in {time.time()-start_time:.2f}s")
         if self.best_candidate is not None:
             return self.best_candidate.params, self.best_candidate.score

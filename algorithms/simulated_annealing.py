@@ -74,12 +74,23 @@ class SimulatedAnnealingOptimizer:
         import time
         self.initialize_population()
         start_time = time.time()
+        best_score = float('-inf')
+        self._no_improve_count = 0
         for i in range(max_iters):
             self.evaluate_population()
             self.update_state()
             scores = [c.score for c in self.population]
-            print(f"[Engine] Iter {i+1}/{max_iters} | Best={max(scores):.4f} | Time={time.time()-start_time:.2f}s")
+            current_best = max(scores) if scores else float('-inf')
+            print(f"[Engine] Iter {i+1}/{max_iters} | Best={current_best:.4f} | Time={time.time()-start_time:.2f}s")
             self.iteration += 1
+            if current_best > best_score:
+                best_score = current_best
+                self._no_improve_count = 0
+            else:
+                self._no_improve_count += 1
+            if self._no_improve_count >= getattr(self, 'stagnation_limit', 10):
+                print("[Engine] Stopping early due to stagnation.")
+                break
             if self.temperature < self.t_min:
                 break
         print(f"[Engine] Optimization finished in {time.time()-start_time:.2f}s")
