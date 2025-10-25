@@ -1,4 +1,3 @@
-# core/model_search_manager.py
 import importlib
 import inspect
 import pkgutil
@@ -8,6 +7,12 @@ from optiflow.core.optimization_engine import OptimizationEngine
 
 
 class ModelSearchManager:
+    """Manages model hyperparameter search across registered model configurations.
+
+    Automatically loads available models, initializes an optimization engine,
+    and executes searches for one or multiple models using a chosen optimization strategy.
+    """
+
     def __init__(self,
                  models_package: str = "models",
                  strategy: str = "genetic",
@@ -17,6 +22,18 @@ class ModelSearchManager:
                  n_jobs: int = -1,
                  strategy_params: dict = None,
                  custom_metric_fn=None):
+        """Initialize a model search manager.
+
+        Args:
+            models_package (str): Name of the Python package containing model definitions.
+            strategy (str): Optimization strategy key (e.g., 'genetic').
+            n_samples (int): Number of samples or candidates to test per model.
+            scoring (str): Evaluation metric name (e.g., 'accuracy', 'f1').
+            cv (int): Number of cross-validation folds.
+            n_jobs (int): Number of parallel jobs (-1 means all cores).
+            strategy_params (dict, optional): Extra parameters for the optimizer.
+            custom_metric_fn (Callable, optional): Custom scoring function (y_true, y_pred) -> float.
+        """
         self.models_package = models_package
         self.strategy = strategy
         self.n_samples = n_samples
@@ -27,9 +44,12 @@ class ModelSearchManager:
         self.custom_metric_fn = custom_metric_fn
         self.model_configs = self._load_all_configs()
 
-    # ---------------- Auto-load all models ---------------- #
     def _load_all_configs(self) -> Dict[str, Any]:
-        """Auto-load all model configs from the given package."""
+        """Load all model configurations from the specified models package.
+
+        Returns:
+            Dict[str, Any]: Mapping from model name to configuration class.
+        """
         package = importlib.import_module(self.models_package)
         configs = {}
         for _, modname, _ in pkgutil.iter_modules(package.__path__):
@@ -39,9 +59,17 @@ class ModelSearchManager:
                     configs[obj.name] = obj
         return configs
 
-    # ---------------- Run for single model ---------------- #
     def search_model(self, model_name: str, dataset: Tuple, max_iters: int = 10):
-        """Run optimization for a single model using OptimizationEngine."""
+        """Run hyperparameter optimization for a single model.
+
+        Args:
+            model_name (str): Name of the model to optimize.
+            dataset (Tuple): Tuple of (X, y) data.
+            max_iters (int): Number of optimization iterations.
+
+        Returns:
+            dict: Contains best model instance, parameters, and score.
+        """
         if model_name not in self.model_configs:
             raise ValueError(f"Unknown model: {model_name}")
 
@@ -54,7 +82,6 @@ class ModelSearchManager:
             strategy_params=self.strategy_params
         )
 
-        # Optional custom metric
         if self.custom_metric_fn:
             engine.set_custom_metric(self.custom_metric_fn)
 
@@ -65,18 +92,23 @@ class ModelSearchManager:
             print(f"[DONE] {model_name} best_score=None")
         return {"model": model, "params": params, "score": score}
 
-    # ---------------- Run for all registered models ---------------- #
     def search_all(self, dataset: Tuple, max_iters: int = 10):
-        """Run optimization for all registered models."""
+        """Run optimization for all registered models.
+
+        Args:
+            dataset (Tuple): Tuple of (X, y) data.
+            max_iters (int): Number of optimization iterations per model.
+
+        Returns:
+            list[dict]: Sorted list of model results with their scores.
+        """
         results = []
         for model_name in MODEL_REGISTRY.keys():
             res = self.search_model(model_name, dataset, max_iters)
             res["model_name"] = model_name
             results.append(res)
 
-        # Sort models by descending score
         results = sorted(results, key=lambda r: r["score"], reverse=True)
-
         print("\n[SUMMARY] Best models:")
         for rank, r in enumerate(results, 1):
             print(f"{rank}. {r['model_name']} -> score={r['score']:.4f}")

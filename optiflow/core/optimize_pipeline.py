@@ -6,7 +6,27 @@ from sklearn.metrics import accuracy_score
 from joblib import Parallel, delayed
 import numpy as np
 
+
 def optimize_model(model, param_grid, X, y, cv=5, n_jobs=-1, verbose=True):
+    """Perform manual optimization over a set of parameter configurations.
+
+    Evaluates multiple hyperparameter combinations using cross-validation,
+    reports progress, logs results, and saves a JSON summary.
+
+    Args:
+        model: A scikit-learn compatible estimator.
+        param_grid (list[dict]): List of parameter combinations to test.
+        X: Feature matrix.
+        y: Target vector.
+        cv (int): Number of cross-validation folds.
+        n_jobs (int): Number of parallel workers (-1 for all cores).
+        verbose (bool): Whether to print iteration logs.
+
+    Returns:
+        tuple: (best_result, results)
+            - best_result (dict): The best performing parameter configuration.
+            - results (list[dict]): All configurations with scores and timings.
+    """
     results = []
     start_time = time.time()
     total_configs = len(param_grid)
@@ -16,11 +36,11 @@ def optimize_model(model, param_grid, X, y, cv=5, n_jobs=-1, verbose=True):
         for i, params in enumerate(param_grid):
             iter_start = time.time()
             model.set_params(**params)
-            
+
             scores = cross_val_score(model, X, y, cv=cv, n_jobs=n_jobs)
             mean_score = np.mean(scores)
             iter_time = time.time() - iter_start
-            
+
             results.append({
                 "iteration": i + 1,
                 "params": params,

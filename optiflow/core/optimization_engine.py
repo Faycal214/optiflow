@@ -1,22 +1,37 @@
-# core/optimization_engine.py
 import time
 from sklearn.metrics import accuracy_score, f1_score, mean_squared_error
 from optiflow.models.registry import MODEL_REGISTRY
 from optiflow.core.parallel_executor import ParallelExecutor
-from optimizers.genetic import GeneticOptimizer
-from optimizers.pso import PSOOptimizer
-from optimizers.bayesian import BayesianOptimizer
-from optimizers.simulated_annealing import SimulatedAnnealingOptimizer
-from optimizers.tpe import TPEOptimizer
-from optimizers.random_search import RandomSearchOptimizer
+from optiflow.optimizers.genetic import GeneticOptimizer
+from optiflow.optimizers.pso import PSOOptimizer
+from optiflow.optimizers.bayesian import BayesianOptimizer
+from optiflow.optimizers.simulated_annealing import SimulatedAnnealingOptimizer
+from optiflow.optimizers.tpe import TPEOptimizer
+from optiflow.optimizers.random_search import RandomSearchOptimizer
+
 
 class OptimizationEngine:
+    """Main engine that coordinates model optimization.
+
+    Handles the interaction between models, optimizers, datasets, and metrics.
+    Executes optimization iterations and tracks the best configuration found.
+    """
+
     def __init__(self, model_key: str, optimizer_key: str = "genetic", dataset=None, metric="accuracy", strategy_params=None):
+        """Initialize an optimization engine for a given model and optimizer.
+
+        Args:
+            model_key (str): Key identifying the model in MODEL_REGISTRY.
+            optimizer_key (str): Name of the optimizer (e.g., 'genetic', 'pso').
+            dataset (tuple): Tuple of (X, y) for training and evaluation.
+            metric (str or callable): Evaluation metric or custom metric function.
+            strategy_params (dict, optional): Optimizer-specific parameters.
+        """
         self.model_key = model_key
         self.optimizer_key = optimizer_key.lower()
         self.dataset = dataset
         self.metric = metric
-        self.custom_metric_fn = None  # user-supplied callable
+        self.custom_metric_fn = None
         self.strategy_params = strategy_params or {}
 
         cfg = MODEL_REGISTRY[model_key]
@@ -24,7 +39,7 @@ class OptimizationEngine:
         self.wrapper = cfg.get_wrapper()
         self.executor = ParallelExecutor()
 
-        # Pass optimizer-specific parameters using **self.strategy_params
+        # Select optimizer
         if self.optimizer_key == "pso":
             self.optimizer = PSOOptimizer(self.search_space, **self.strategy_params)
         elif self.optimizer_key == "bayesian":
@@ -40,15 +55,26 @@ class OptimizationEngine:
         else:
             raise ValueError(f"Unknown optimizer: {self.optimizer_key}")
 
-
-    # ---------------- Metric Handling ---------------- #
     def set_custom_metric(self, metric_fn):
-        """Allow user to provide their own custom metric function."""
+        """Set a custom evaluation metric function.
+
+        Args:
+            metric_fn (callable): Function(y_true, y_pred) -> float.
+        """
         self.custom_metric_fn = metric_fn
 
     def _evaluate_metric(self, y_true, y_pred):
-        """
-        Compute chosen metric. Supports classic metrics and custom callable. Validates compatibility.
+        """Evaluate model predictions using the selected metric.
+
+        Supports standard metrics (accuracy, f1, precision, recall, etc.)
+        and user-supplied callable metrics.
+
+        Args:
+            y_true: Ground truth labels.
+            y_pred: Predicted labels or probabilities.
+
+        Returns:
+            float: Computed metric score.
         """
         metric = self.custom_metric_fn if callable(self.custom_metric_fn) else self.metric
         if callable(metric):
@@ -86,8 +112,18 @@ class OptimizationEngine:
             print(f"[Engine] Metric evaluation error: {e}")
             return float('-inf')
 
-    # ---------------- Main Optimization ---------------- #
     def run(self, max_iters=10):
+        """Execute the optimization process.
+
+        Runs multiple iterations of candidate generation, evaluation,
+        metric computation, and selection of the best configuration.
+
+        Args:
+            max_iters (int): Number of optimization iterations.
+
+        Returns:
+            tuple: (final_model, best_params, best_score)
+        """
         X, y = self.dataset
         best = None
         total_start = time.time()

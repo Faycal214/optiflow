@@ -2,11 +2,19 @@ from sklearn.neural_network import MLPClassifier
 from optiflow.core.search_space import SearchSpace
 from optiflow.core.model_wrapper import ModelWrapper
 
+
 class MLPConfig:
+    """Configuration for Multi-Layer Perceptron classifier."""
+
     name = "mlp"
 
     @staticmethod
     def build_search_space():
+        """Define the hyperparameter search space for MLPClassifier.
+
+        Returns:
+            SearchSpace: Search space containing architecture and training parameters.
+        """
         s = SearchSpace()
         s.add("hidden_layer_sizes", "categorical", [
             (50,), (100,), (200,), (100, 50), (200, 100, 50), (500, 250, 100)
@@ -26,4 +34,9 @@ class MLPConfig:
 
     @staticmethod
     def get_wrapper():
+        """Return model wrapper for MLPClassifier.
+
+        Returns:
+            ModelWrapper: Wrapper for the neural network classifier.
+        """
         return ModelWrapper(MLPClassifier)

@@ -3,10 +3,21 @@ from optiflow.core.search_space import SearchSpace
 from optiflow.core.model_wrapper import ModelWrapper
 
 class DecisionTreeConfig:
+    """Configuration class for Decision Tree model optimization.
+
+    Defines the model name, its hyperparameter search space, and the wrapper
+    used to integrate with the optimization engine.
+    """
+
     name = "decision_tree"
 
     @staticmethod
     def build_search_space():
+        """Construct the hyperparameter search space for DecisionTreeClassifier.
+
+        Returns:
+            SearchSpace: Configured search space with all tunable parameters.
+        """
         s = SearchSpace()
         s.add("criterion", "categorical", ["gini", "entropy", "log_loss"])
         s.add("splitter", "categorical", ["best", "random"])
@@ -20,4 +31,9 @@ class DecisionTreeConfig:
 
     @staticmethod
     def get_wrapper():
+        """Return a model wrapper for DecisionTreeClassifier.
+
+        Returns:
+            ModelWrapper: Wrapper providing standardized model interface.
+        """
         return ModelWrapper(DecisionTreeClassifier)

@@ -1,4 +1,9 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "hybrid-opt"
-version = "0.1.0"
-dependencies = ["numpy","scikit-learn"]
+name = "optiflow"
+version = "0.0.1"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scikit-learn", "tqdm"]

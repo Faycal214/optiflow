@@ -2,7 +2,69 @@ import random
 import numpy as np
 
 class PSOOptimizer:
-    def __init__(self, search_space, metric, model_class, X, y, n_particles=20, w=0.7, c1=1.4, c2=1.4, velocity_threshold=1e-3, stagnation_limit=10):
+    """Particle Swarm Optimization (PSO) optimizer for hyperparameter tuning.
+
+    PSO is a population-based metaheuristic inspired by social behavior of birds or fish.
+    Each "particle" represents a possible model configuration (set of hyperparameters).
+    Particles move through the search space by combining their own best experiences
+    with those of the overall swarm, gradually converging toward optimal solutions.
+
+    Attributes:
+        search_space (SearchSpace): Object defining the parameter types and ranges.
+        metric (callable or str): Evaluation function or scorer name from sklearn.
+        model_class (type): Model class (e.g., `RandomForestClassifier`).
+        X (array-like): Training feature matrix.
+        y (array-like): Target vector.
+        n_particles (int): Number of particles in the swarm.
+        w (float): Inertia weight controlling exploration vs exploitation.
+        c1 (float): Cognitive coefficient (influence of particle's personal best).
+        c2 (float): Social coefficient (influence of global best).
+        velocity_threshold (float): Minimum velocity magnitude to trigger stagnation.
+        stagnation_limit (int): Number of iterations allowed without improvement before stopping.
+        global_best_position (np.ndarray or None): Best position found by the swarm.
+        global_best_score (float): Best score achieved by any particle.
+        iteration (int): Current iteration count.
+        best_params (dict or None): Best decoded hyperparameter set found.
+    """
+
+    class Particle:
+        """Represents one individual (particle) in the PSO swarm.
+
+        Each particle tracks:
+          - its current position (parameter vector)
+          - its velocity
+          - its own best historical position and score.
+
+        Attributes:
+            position (np.ndarray): Current position in the search space.
+            velocity (np.ndarray): Current movement vector.
+            best_position (np.ndarray): Best position this particle has seen.
+            best_score (float): Best score this particle has achieved.
+        """
+        def __init__(self, position, velocity):
+            self.position = position
+            self.velocity = velocity
+            self.best_position = position.copy()
+            self.best_score = float('-inf')
+
+    def __init__(self, search_space, metric, model_class, X, y,
+                 n_particles=20, w=0.7, c1=1.4, c2=1.4,
+                 velocity_threshold=1e-3, stagnation_limit=10):
+        """Initializes the PSO optimizer.
+
+        Args:
+            search_space (SearchSpace): Defines hyperparameter search bounds.
+            metric (callable or str): Metric or scorer to evaluate model performance.
+            model_class (type): Model class to be instantiated and trained.
+            X (array-like): Training features.
+            y (array-like): Training targets.
+            n_particles (int, optional): Number of particles. Defaults to 20.
+            w (float, optional): Inertia weight for velocity. Defaults to 0.7.
+            c1 (float, optional): Cognitive coefficient. Defaults to 1.4.
+            c2 (float, optional): Social coefficient. Defaults to 1.4.
+            velocity_threshold (float, optional): Stopping threshold. Defaults to 1e-3.
+            stagnation_limit (int, optional): Early stop limit. Defaults to 10.
+        """
         self.search_space = search_space
         self.metric = metric
         self.model_class = model_class
@@ -22,14 +84,8 @@ class PSOOptimizer:
         self.iteration = 0
         self.best_params = None
 
-    class Particle:
-        def __init__(self, position, velocity):
-            self.position = position
-            self.velocity = velocity
-            self.best_position = position.copy()
-            self.best_score = float('-inf')
-
     def initialize_population(self):
+        """Initializes particles with random positions and zero velocities."""
         self.particles = []
         for _ in range(self.n_particles):
             p = self.search_space.sample()
@@ -43,6 +99,14 @@ class PSOOptimizer:
         self.best_params = None
 
     def _encode_position(self, param_dict):
+        """Encodes a parameter dictionary into a numerical vector.
+
+        Args:
+            param_dict (dict): Dictionary of hyperparameters.
+
+        Returns:
+            np.ndarray: Encoded numeric vector for internal computation.
+        """
         vec = []
         for name, info in self.param_info.items():
             if info["type"] == "categorical":
@@ -52,6 +116,14 @@ class PSOOptimizer:
         return np.array(vec)
 
     def _decode_position(self, vec):
+        """Decodes a numerical vector into a valid parameter dictionary.
+
+        Args:
+            vec (np.ndarray): Encoded position vector.
+
+        Returns:
+            dict: Dictionary of decoded parameter values.
+        """
         params = {}
         for i, (name, info) in enumerate(self.param_info.items()):
             val = vec[i]
@@ -63,11 +135,15 @@ class PSOOptimizer:
                 params[name] = int(np.clip(round(val), low, high))
             else:
                 low, high = info["values"]
-
-        params[name] = float(np.clip(val, low, high))
+                params[name] = float(np.clip(val, low, high))
         return params
 
     def evaluate_particles(self):
+        """Trains and evaluates models for all particles.
+
+        Each particle’s model is trained using its decoded parameters.
+        The fitness (score) is then computed using the provided metric.
+        """
         for particle in self.particles:
             params = self._decode_position(particle.position)
             try:
@@ -90,6 +166,11 @@ class PSOOptimizer:
                 self.best_params = params
 
     def update_particles(self):
+        """Updates all particle velocities and positions using PSO equations.
+
+        Uses inertia (w), cognitive (c1), and social (c2) terms to update movement.
+        Returns the best parameters and score found in the iteration.
+        """
         for particle in self.particles:
             r1 = np.random.rand(len(particle.position))
             r2 = np.random.rand(len(particle.position))
@@ -98,8 +179,7 @@ class PSOOptimizer:
             particle.velocity = self.w * particle.velocity + cognitive + social
             particle.position += particle.velocity
 
-
-        # Find best candidate by evaluating all particles
+        # Evaluate updated particles and return the best one
         best_params = None
         best_score = float('-inf')
         for particle in self.particles:
@@ -119,92 +199,40 @@ class PSOOptimizer:
                 best_score = score
                 best_params = params
         if best_params is not None:
-            print(f"Result for pso: score={best_score:.4f}, params={best_params}")
+            print(f"Result for PSO: score={best_score:.4f}, params={best_params}")
             return best_params, best_score
         else:
-            print("Result for pso: score=-inf, params={}")
+            print("Result for PSO: score=-inf, params={}")
             return {}, float('-inf')
 
-    def _update_state(self, candidates, scores=None):
-        # Update personal and global bests
-        for p, cand in zip(self.particles, candidates):
-            score = cand.score
-            if score > p.best_score:
-                p.best_score = score
-                p.best_position = p.position.copy()
-            if score > self.global_best_score:
-                self.global_best_score = score
-                self.global_best_position = p.position.copy()
-
-        # Update velocities and positions
-        for p in self.particles:
-            r1, r2 = np.random.rand(len(p.position)), np.random.rand(len(p.position))
-            cognitive = self.c1 * r1 * (p.best_position - p.position)
-            social = self.c2 * r2 * (self.global_best_position - p.position)
-            p.velocity = self.w * p.velocity + cognitive + social
-            p.position += p.velocity
-
-        # Stagnation tracking
-        best_score = self.global_best_score
-        if self.global_best_score > (getattr(self, '_prev_best_score', float('-inf'))):
-            self._no_improve_count = 0
-        else:
-            self._no_improve_count += 1
-        self._prev_best_score = self.global_best_score
-
-    def _check_stop_condition(self, max_iter=None):
-        # Stop if velocity below threshold or stagnation or max_iter
-        if max_iter is not None and self.iteration >= max_iter:
-            return True
-        velocities = [np.linalg.norm(p.velocity) for p in self.particles]
-        if all(v < self.velocity_threshold for v in velocities):
-            return True
-        if self._no_improve_count >= self.stagnation_limit:
-            return True
-        return False
-
-    def _log_progress(self, i, scores, time_elapsed):
-        best_score = max(scores) if scores else None
-        print(f"[Engine] Iter {i+1} | Best={best_score:.4f} | Time={time_elapsed:.2f}s")
-
-
-
-
-    def update(self, results):
-        # Update personal and global bests
-        for p, cand in zip(self.particles, results):
-            score = cand.score
-            if p.best_position is None:
-                p.best_position = p.position.copy()
-                p.best_score = score
-            if score > p.best_score:
-                p.best_score = score
-                p.best_position = p.position.copy()
-            if self.global_best_position is None or score > self.global_best_score:
-                self.global_best_score = score
-                self.global_best_position = p.position.copy()
-
-        # Only update if global_best_position is set
-        for p in self.particles:
-            if self.global_best_position is None or p.best_position is None:
-                continue
-            r1, r2 = np.random.rand(len(p.position)), np.random.rand(len(p.position))
-            cognitive = self.c1 * r1 * (p.best_position - p.position)
-            social = self.c2 * r2 * (self.global_best_position - p.position)
-            p.velocity = self.w * p.velocity + cognitive + social
-            p.position += p.velocity
-
     def get_best_params(self):
+        """Returns the best decoded parameter configuration found so far.
+
+        Returns:
+            dict: Decoded best parameters.
+        """
         return self._decode_position(self.global_best_position)
-    
+
     def run(self, max_iters=10):
+        """Executes the PSO optimization loop.
+
+        The algorithm runs up to `max_iters` iterations or stops early
+        when no improvement occurs for several iterations.
+
+        Args:
+            max_iters (int, optional): Maximum iterations. Defaults to 10.
+
+        Returns:
+            tuple[dict, float]: Best parameter dictionary and score.
+        """
         import time
         self.initialize_population()
         start_time = time.time()
         self.best_candidate = None
         for i in range(max_iters):
             self.evaluate_particles()
-            # Find best candidate in current population
+
+            # Identify current best performer
             best_score = float('-inf')
             best_params = None
             for particle in self.particles:
@@ -223,18 +251,21 @@ class PSOOptimizer:
                 if score > best_score:
                     best_score = score
                     best_params = params
-            # Update best_candidate
+
+            # Track best candidate
             if self.best_candidate is None or best_score > self.best_candidate.score:
                 class Candidate:
                     def __init__(self, params, score):
                         self.params = params
                         self.score = score
                 self.best_candidate = Candidate(best_params, best_score)
+
             self.update_particles()
             print(f"[Engine] Iter {i+1}/{max_iters} | Best={self.best_candidate.score:.4f} | Time={time.time()-start_time:.2f}s\n")
             if self._no_improve_count >= self.stagnation_limit:
                 print("[Engine] Stopping early due to stagnation.")
                 break
+
         print(f"[Engine] Optimization finished in {time.time()-start_time:.2f}s")
         if self.best_candidate is not None:
             return self.best_candidate.params, self.best_candidate.score

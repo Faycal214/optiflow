@@ -1,17 +1,44 @@
 import random
 import math
-from typing import Dict, Any, Iterable, List, Optional
+from typing import Dict, Any, List, Optional
 import numpy as np
 
 class SearchSpace:
+    """Defines and samples hyperparameter search spaces."""
+
     def __init__(self, parameters: Optional[Dict[str, Dict[str, Any]]] = None):
+        """Initialize a search space.
+
+        Args:
+            parameters (dict, optional): Dictionary defining parameters and their types.
+                Example:
+                {
+                    "lr": {"type": "continuous", "values": (1e-4, 1e-1), "log": True},
+                    "n_estimators": {"type": "discrete", "values": (50, 200)},
+                    "criterion": {"type": "categorical", "values": ["gini", "entropy"]}
+                }
+        """
         self.parameters: Dict[str, Dict[str, Any]] = parameters or {}
 
     def add(self, name: str, param_type: str, values, log: bool = False):
+        """Add a parameter to the search space.
+
+        Args:
+            name (str): Parameter name.
+            param_type (str): One of `{"continuous", "discrete", "categorical"}`.
+            values (tuple or list): Value range or list of options.
+            log (bool, optional): Use logarithmic scale for continuous values.
+                Defaults to False.
+        """
         assert param_type in ("continuous", "discrete", "categorical")
         self.parameters[name] = {"type": param_type, "values": values, "log": log}
 
     def sample(self) -> Dict[str, Any]:
+        """Sample a random hyperparameter configuration.
+
+        Returns:
+            dict: Randomly chosen parameter values within defined ranges.
+        """
         out = {}
         for name, info in self.parameters.items():
             t, v, log = info["type"], info["values"], info["log"]
@@ -25,7 +52,6 @@ class SearchSpace:
                     out[name] = float(random.uniform(low, high))
 
             elif t == "discrete":
-                # accept either range tuple (low, high) or explicit list/tuple of choices
                 if isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, (int, float)) for x in v):
                     low, high = int(v[0]), int(v[1])
                     out[name] = int(random.randint(low, high))
@@ -38,12 +64,16 @@ class SearchSpace:
         return out
 
     def grid_sample(self, n_per_cont: int = 5, max_configs: Optional[int] = 10000) -> List[Dict[str, Any]]:
-        """
-        Hybrid grid expansion:
-         - categorical: full expansion
-         - discrete: if given as (low,high) expand all integers in range; else expand listed values
-         - continuous: sample n_per_cont points on linear or log grid
-        If total configs > max_configs and max_configs is not None, return a random subset of size max_configs.
+        """Generate a grid of parameter combinations for exhaustive or hybrid search.
+
+        Args:
+            n_per_cont (int, optional): Number of samples per continuous dimension.
+                Defaults to 5.
+            max_configs (int, optional): Maximum allowed number of configurations.
+                If exceeded, random subset is returned. Defaults to 10,000.
+
+        Returns:
+            list of dict: List of parameter dictionaries for grid search.
         """
         grids = [{}]
         for name, info in self.parameters.items():
@@ -85,14 +115,10 @@ class SearchSpace:
 
             grids = new_grids
 
-            # quick protection: if growth explodes stop early and sample subset
             if len(grids) > max_configs and max_configs is not None:
-                # sample subset without replacement
                 return random.sample(grids, max_configs)
 
-        # final safety: if still too big, randomly sample
         if max_configs is not None and len(grids) > max_configs:
             return random.sample(grids, max_configs)
 
         return grids
-

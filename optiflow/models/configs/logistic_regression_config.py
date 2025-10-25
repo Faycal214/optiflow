@@ -2,11 +2,19 @@ from sklearn.linear_model import LogisticRegression
 from optiflow.core.search_space import SearchSpace
 from optiflow.core.model_wrapper import ModelWrapper
 
+
 class LogisticRegressionConfig:
+    """Configuration for Logistic Regression classifier."""
+
     name = "logistic_regression"
 
     @staticmethod
     def build_search_space():
+        """Define the hyperparameter search space for LogisticRegression.
+
+        Returns:
+            SearchSpace: Search space defining solver, penalty, and regularization settings.
+        """
         s = SearchSpace()
         s.add("C", "continuous", [1e-5, 1e4], log=True)
         s.add("penalty", "categorical", ["l1", "l2", "elasticnet", "none"])
@@ -20,4 +28,9 @@ class LogisticRegressionConfig:
 
     @staticmethod
     def get_wrapper():
+        """Return model wrapper for LogisticRegression.
+
+        Returns:
+            ModelWrapper: Wrapper for the logistic regression model.
+        """
         return ModelWrapper(LogisticRegression)
